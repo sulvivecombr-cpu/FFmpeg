@@ -45,6 +45,9 @@ docker compose -f docker-compose.base44.yml up -d --build
 
 ## Checks
 
+- CI (`.github/workflows/base44-checks.yml`) validates the compose file and the
+  demo server syntax on every pull request; run the same two commands locally
+  before pushing.
 - `curl -fsS http://localhost:3000/healthz` — demo server up.
 - `docker compose -f docker-compose.base44.yml exec demo ffmpeg -version` — the
   built binary.
