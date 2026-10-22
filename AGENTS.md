@@ -55,3 +55,20 @@ docker compose -f docker-compose.base44.yml up -d --build
   run them from a build container only when you have the samples:
   `docker compose -f docker-compose.base44.yml run --rm ffmpeg-build tests/fate-run.sh`
   style targets live in `make fate` (requires `SAMPLES`).
+
+## Troubleshooting
+
+| Symptom | Cause / fix |
+| --- | --- |
+| `up -d` appears to hang | Expected on a first boot: `demo` waits for `ffmpeg-build` to finish. Watch with `docker compose -f docker-compose.base44.yml logs -f ffmpeg-build`. |
+| Build container exits non-zero | Read its log — usually a compile/configure error in the checked-out tree or a full disk. Fix the code, then re-run `run --rm ffmpeg-build`; the object tree in the volume is reused. |
+| `demo` restart loops with `error while loading shared libraries: libvpx.so.7` / `libx264.so.164` | Builder and runtime images drifted to different Debian releases. Keep both on `debian:bookworm-slim` and `docker compose -f docker-compose.base44.yml build demo`. |
+| Page loads but every encode fails | `/api/info` reporting `ffmpeg not found` means the install volume is empty: re-run the `ffmpeg-build` service. |
+| Encode hangs, container killed later | `palettegen` buffers until EOF — never feed it an infinite lavfi source (see above). |
+| Port 3000 already in use | `docker compose -f docker-compose.base44.yml ps`, then `down` the other stack or stop the other process. |
+| Full reset (drops build cache and demo media) | `docker compose -f docker-compose.base44.yml down -v`, then `up -d --build`. |
+
+## Not for production
+
+This is a development preview. `demo` has no authentication, binds `0.0.0.0:3000`
+and accepts unauthenticated encode requests, so never expose it publicly as-is.

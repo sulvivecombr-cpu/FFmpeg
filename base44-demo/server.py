@@ -29,6 +29,8 @@ MEDIA_FILES = {
 
 _info_lock = threading.Lock()
 _info_cache = {"at": 0.0, "data": None}
+# One encode at a time: two concurrent runs would write the same media files.
+_encode_lock = threading.Lock()
 
 
 def run(cmd, timeout=180, full=False):
@@ -162,21 +164,22 @@ def files_payload():
 
 def describe(kind):
     """Run one encode action and collect everything the page shows."""
-    steps = ACTIONS[kind]()
-    result = {
-        "ok": all(step["returncode"] == 0 for step in steps),
-        "steps": steps,
-        "files": files_payload(),
-    }
-    if kind == "mp4" and result["ok"]:
-        probe = probe_mp4()
-        try:
-            result["probe"] = json.loads(probe["stdout"])
-        except ValueError:
-            result["probe"] = None
-        probe["stdout"] = probe["stdout"][-1600:]  # display copy only
-        result["steps"].append(probe)
-    return result
+    with _encode_lock:
+        steps = ACTIONS[kind]()
+        result = {
+            "ok": all(step["returncode"] == 0 for step in steps),
+            "steps": steps,
+            "files": files_payload(),
+        }
+        if kind == "mp4" and result["ok"]:
+            probe = probe_mp4()
+            try:
+                result["probe"] = json.loads(probe["stdout"])
+            except ValueError:
+                result["probe"] = None
+            probe["stdout"] = probe["stdout"][-1600:]  # display copy only
+            result["steps"].append(probe)
+        return result
 
 
 PAGE = """<!doctype html>
@@ -372,6 +375,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(size))
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         with open(path, "rb") as fh:
             while True:
@@ -414,6 +418,9 @@ class Handler(BaseHTTPRequestHandler):
         if kind not in ACTIONS:
             self.send_json({"error": "unknown action"}, 400)
             return
+        length = int(self.headers.get("Content-Length") or 0)
+        if length:  # drain any body so keep-alive connections stay in sync
+            self.rfile.read(length)
         try:
             self.send_json(describe(kind))
         except Exception as exc:  # keep the demo page usable on any failure
