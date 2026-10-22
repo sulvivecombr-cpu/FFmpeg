@@ -56,3 +56,6 @@
 /libavfilter/vulkan/*.c
 /.*/
 !/.forgejo/
+!/.base44/
+!/.github/
+/base44-demo/__pycache__/

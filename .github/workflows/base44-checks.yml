@@ -1,0 +1,26 @@
+name: Base44 checks
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: base44-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Compose and demo server
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate docker-compose.base44.yml
+        run: docker compose -f docker-compose.base44.yml config -q
+
+      - name: Check demo server syntax
+        run: python3 -m py_compile base44-demo/server.py

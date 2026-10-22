@@ -1,0 +1,80 @@
+# Base44 development environment for the FFmpeg checkout.
+#
+#   docker compose -f docker-compose.base44.yml up -d --build
+#
+# `ffmpeg-build` compiles this checkout out-of-tree into the `ffmpeg-install`
+# volume (nothing is written into the repository). `demo` serves the preview on
+# host port 3000 and runs the binaries from that volume.
+name: ffmpeg-base44
+
+services:
+  ffmpeg-build:
+    build:
+      context: .
+      dockerfile: Dockerfile.base44
+    working_dir: /build
+    volumes:
+      - ./:/src
+      - ffmpeg-build:/build
+      - ffmpeg-install:/opt/ffmpeg
+    command:
+      - sh
+      - -ec
+      - |
+        /src/configure \
+          --prefix=/opt/ffmpeg \
+          --enable-gpl \
+          --enable-libx264 \
+          --enable-libvpx \
+          --disable-doc \
+          --disable-debug \
+          --disable-ffplay \
+        && make -j$$(nproc) \
+        && make install \
+        && echo "FFMPEG BUILD COMPLETE" \
+        && /opt/ffmpeg/bin/ffmpeg -hide_banner -version | head -n 1
+    restart: "no"
+    labels:
+      base44.project: FFmpeg
+      base44.kind: worker
+
+  demo:
+    build:
+      context: .
+      dockerfile: Dockerfile.demo
+    working_dir: /app
+    command: ["python3", "base44-demo/server.py", "--reload"]
+    volumes:
+      - ./:/app:ro
+      - ffmpeg-install:/opt/ffmpeg:ro
+      - demo-media:/tmp/media
+    environment:
+      - PATH=/opt/ffmpeg/bin:/usr/local/bin:/usr/bin:/bin
+      - PORT=3000
+      - MEDIA_DIR=/tmp/media
+      - BASE44_PREVIEW_MODE
+    ports:
+      - "3000:3000"
+    depends_on:
+      ffmpeg-build:
+        condition: service_completed_successfully
+    restart: on-failure
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import urllib.request;urllib.request.urlopen('http://127.0.0.1:3000/healthz', timeout=4).read()"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    labels:
+      base44.project: FFmpeg
+      base44.kind: web
+      base44.port: "3000"
+
+volumes:
+  ffmpeg-build:
+  ffmpeg-install:
+  demo-media:
