@@ -1,0 +1,14 @@
+# Base44 sandbox image: runtime for the demo page.
+# Same Debian release as the build image (bookworm) so the shared libraries the
+# FFmpeg binaries link against (libx264 / libvpx) match; plus Python 3 for the
+# standard-library demo server.
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      python3 \
+      libx264-164 \
+      libvpx7 \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app

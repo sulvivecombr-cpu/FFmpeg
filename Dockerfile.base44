@@ -1,0 +1,19 @@
+# Base44 sandbox image: build toolchain for FFmpeg.
+# Contains dependencies only — never the application source (that is bind-mounted).
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      build-essential \
+      make \
+      pkg-config \
+      nasm \
+      yasm \
+      libx264-dev \
+      libvpx-dev \
+      zlib1g-dev \
+      ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+ENV SRC_PATH=/src
+WORKDIR /build
