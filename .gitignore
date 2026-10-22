@@ -57,3 +57,4 @@
 /.*/
 !/.forgejo/
 !/.base44/
+/base44-demo/__pycache__/
